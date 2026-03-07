@@ -1,4 +1,4 @@
-package customurl
+package shorturl
 
 import (
 	"context"

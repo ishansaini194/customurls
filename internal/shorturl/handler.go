@@ -1,4 +1,4 @@
-package customurl
+package shorturl
 
 import (
 	"github.com/gofiber/fiber/v2"
