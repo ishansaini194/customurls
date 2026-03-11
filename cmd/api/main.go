@@ -4,12 +4,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/ishansaini194/customurls/internal/server"
 	"github.com/ishansaini194/customurls/internal/shorturl"
 )
 
 func main() {
-	app := fiber.New()
+	httpServer := server.New()
 
 	dbURL := os.Getenv("DATABASE_URL")
 
@@ -21,8 +21,8 @@ func main() {
 	service := shorturl.NewService(repo)
 	handler := shorturl.NewHandler(service)
 
-	app.Post("/shorten", handler.CreateShortUrl)
-	app.Get("/:custom", handler.Redirect)
+	httpServer.App.Post("/shorten", handler.CreateShortUrl)
+	httpServer.App.Get("/:custom", handler.Redirect)
 
-	log.Fatal(app.Listen(":8080"))
+	log.Fatal(httpServer.Start(":8080"))
 }
