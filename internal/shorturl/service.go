@@ -1,6 +1,13 @@
 package shorturl
 
-import "context"
+import (
+	"context"
+	"errors"
+	"math/rand"
+	"time"
+
+	"github.com/ishansaini194/customurls/internal/helpers"
+)
 
 type Service interface {
 	CreateShortUrl(ctx context.Context, originalUrl, customUrl string) (string, error)
@@ -17,7 +24,18 @@ func NewService(r Repository) Service {
 
 func (s *service) CreateShortUrl(ctx context.Context, originalUrl, customUrl string) (string, error) {
 
-	if err := s.repository.Create(ctx, originalUrl, customUrl); err != nil {
+	originalUrl = helpers.EnforceHTTP(originalUrl)
+
+	if !helpers.RemoveDomainError(originalUrl) {
+		return "", errors.New("cannot shorten own domain")
+	}
+
+	if customUrl == "" {
+		customUrl = generateShort()
+	}
+
+	err := s.repository.Create(ctx, originalUrl, customUrl)
+	if err != nil {
 		return "", err
 	}
 
@@ -26,4 +44,17 @@ func (s *service) CreateShortUrl(ctx context.Context, originalUrl, customUrl str
 
 func (s *service) GetOriginalUrl(ctx context.Context, customUrl string) (string, error) {
 	return s.repository.GetUrl(ctx, customUrl)
+}
+
+func generateShort() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	b := make([]byte, 6)
+	for i := range b {
+		b[i] = charset[r.Intn(len(charset))]
+	}
+
+	return string(b)
 }
