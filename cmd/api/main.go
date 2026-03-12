@@ -5,9 +5,12 @@ import (
 
 	"github.com/ishansaini194/customurls/config"
 	"github.com/ishansaini194/customurls/internal/app"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	_ = godotenv.Load()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
