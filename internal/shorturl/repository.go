@@ -2,9 +2,8 @@ package shorturl
 
 import (
 	"context"
-	"database/sql"
 
-	_ "github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 type Repository interface {
@@ -13,50 +12,33 @@ type Repository interface {
 }
 
 type postgresRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewPostgresRepository(url string) (Repository, error) {
-	db, err := sql.Open("postgres", url)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Ping()
-	if err != nil {
-		return nil, err
-	}
-
-	return &postgresRepository{db}, nil
+func NewPostgresRepository(db *gorm.DB) Repository {
+	return &postgresRepository{db}
 }
 
 func (r *postgresRepository) Create(ctx context.Context, originalUrl, customUrl string) error {
-	query := `
-		INSERT INTO urls (original_url, custom_url)
-		VALUES ($1, $2)
-		`
-	if _, err := r.db.ExecContext(ctx, query, originalUrl, customUrl); err != nil {
-		return err
+	url := &URL{
+		OriginalURL: originalUrl,
+		CustomURL:   customUrl,
 	}
-
-	return nil
+	return r.db.WithContext(ctx).Create(url).Error
 }
 
 func (r *postgresRepository) GetUrl(ctx context.Context, customUrl string) (string, error) {
-	query := `
-		SELECT original_url
-		FROM urls
-		WHERE custom_url = $1
-	`
+	var url URL
+	result := r.db.WithContext(ctx).
+		Where("custom_url = ?", customUrl).
+		First(&url)
 
-	var originalUrl string
-
-	if err := r.db.QueryRowContext(ctx, query, customUrl).Scan(&originalUrl); err != nil {
-		if err == sql.ErrNoRows {
-			return "", sql.ErrNoRows
-		}
-		return "", err
+	if result.Error == gorm.ErrRecordNotFound {
+		return "", ErrNotFound
+	}
+	if result.Error != nil {
+		return "", result.Error
 	}
 
-	return originalUrl, nil
+	return url.OriginalURL, nil
 }

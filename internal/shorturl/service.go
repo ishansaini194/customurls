@@ -16,14 +16,14 @@ type Service interface {
 
 type service struct {
 	repository Repository
+	cache      Cache
 }
 
-func NewService(r Repository) Service {
-	return &service{repository: r}
+func NewService(r Repository, c Cache) Service {
+	return &service{repository: r, cache: c}
 }
 
 func (s *service) CreateShortUrl(ctx context.Context, originalUrl, customUrl string) (string, error) {
-
 	originalUrl = helpers.EnforceHTTP(originalUrl)
 
 	if !helpers.RemoveDomainError(originalUrl) {
@@ -31,11 +31,10 @@ func (s *service) CreateShortUrl(ctx context.Context, originalUrl, customUrl str
 	}
 
 	if customUrl == "" {
-		customUrl = generateShort()
+		customUrl = generateShort(0, "")
 	}
 
-	err := s.repository.Create(ctx, originalUrl, customUrl)
-	if err != nil {
+	if err := s.repository.Create(ctx, originalUrl, customUrl); err != nil {
 		return "", err
 	}
 
@@ -43,17 +42,42 @@ func (s *service) CreateShortUrl(ctx context.Context, originalUrl, customUrl str
 }
 
 func (s *service) GetOriginalUrl(ctx context.Context, customUrl string) (string, error) {
-	return s.repository.GetUrl(ctx, customUrl)
+	// 1. check cache first
+	cached, err := s.cache.Get(ctx, customUrl)
+	if err == nil {
+		return cached.OriginalURL, nil
+	}
+
+	// 2. cache miss, hit postgres
+	originalUrl, err := s.repository.GetUrl(ctx, customUrl)
+	if err != nil {
+		return "", err
+	}
+
+	// 3. populate cache for next time
+	_ = s.cache.Set(ctx, customUrl, &URL{
+		OriginalURL: originalUrl,
+		CustomURL:   customUrl,
+	}, 24*time.Hour)
+
+	return originalUrl, nil
 }
 
-func generateShort() string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const defaultCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+var globalRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	b := make([]byte, 6)
+func generateShort(length int, charset string) string {
+	if length <= 0 {
+		length = 6
+	}
+	if charset == "" {
+		charset = defaultCharset
+	}
+
+	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[r.Intn(len(charset))]
+		b[i] = charset[globalRand.Intn(len(charset))]
 	}
 
 	return string(b)
