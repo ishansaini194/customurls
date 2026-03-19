@@ -10,7 +10,7 @@ import (
 type URL struct {
 	ID          uint       `json:"id"           gorm:"primaryKey;autoIncrement"`
 	OriginalURL string     `json:"original_url" gorm:"not null"`
-	CustomURL   string     `json:"custom_url"   gorm:"uniqueIndex;not null"`
+	ShortID     string     `json:"short_id"     gorm:"uniqueIndex;not null"`
 	CreatedAt   time.Time  `json:"created_at"`
 	ExpiresAt   *time.Time `json:"expires_at"`
 }

@@ -14,6 +14,7 @@ type Handler struct {
 type request struct {
 	Url         string `json:"url"`
 	CustomShort string `json:"customShort"`
+	Alias       string `json:"alias"`
 }
 
 type response struct {
