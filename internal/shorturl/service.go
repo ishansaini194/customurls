@@ -34,6 +34,12 @@ func (s *service) CreateShortUrl(ctx context.Context, originalUrl, customUrl str
 		customUrl = generateShort(0, "")
 	}
 
+	// check duplicate
+	exists, err := s.cache.Exists(ctx, customUrl)
+	if err == nil && exists {
+		return "", errors.New("short url already exists")
+	}
+
 	if err := s.repository.Create(ctx, originalUrl, customUrl); err != nil {
 		return "", err
 	}
