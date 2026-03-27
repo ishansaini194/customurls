@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/ishansaini194/customurls/internal/helpers"
 )
 
 type Service interface {
-	CreateShortUrl(ctx context.Context, originalUrl, shortID string) (string, error)
+	CreateShortUrl(ctx context.Context, originalUrl, alias string) (string, error)
 	GetOriginalUrl(ctx context.Context, shortID string) (string, error)
 }
 
@@ -23,18 +24,15 @@ func NewService(r Repository, c Cache) Service {
 	return &service{repository: r, cache: c}
 }
 
-func (s *service) CreateShortUrl(ctx context.Context, originalUrl, shortID string) (string, error) {
+func (s *service) CreateShortUrl(ctx context.Context, originalUrl, alias string) (string, error) {
 	originalUrl = helpers.EnforceHTTP(originalUrl)
 
 	if !helpers.RemoveDomainError(originalUrl) {
 		return "", errors.New("cannot shorten own domain")
 	}
 
-	if shortID == "" {
-		shortID = generateShort(0, "")
-	}
+	shortID := generateShort(0, "")
 
-	// check duplicate
 	exists, err := s.cache.Exists(ctx, shortID)
 	if err == nil && exists {
 		return "", errors.New("short url already exists")
@@ -44,7 +42,17 @@ func (s *service) CreateShortUrl(ctx context.Context, originalUrl, shortID strin
 		return "", err
 	}
 
-	return shortID, nil
+	return buildShortURL(alias, shortID), nil
+}
+
+func buildShortURL(alias, shortID string) string {
+	domain := os.Getenv("DOMAIN")
+
+	if alias != "" {
+		return "http://" + domain + "/" + alias + "/" + shortID
+	}
+
+	return "http://" + domain + "/" + shortID
 }
 
 func (s *service) GetOriginalUrl(ctx context.Context, shortID string) (string, error) {
