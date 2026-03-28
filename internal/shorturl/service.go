@@ -11,7 +11,7 @@ import (
 )
 
 type Service interface {
-	CreateShortUrl(ctx context.Context, originalUrl, alias string) (string, error)
+	CreateShortUrl(ctx context.Context, originalUrl, alias string, expiry time.Duration) (string, error)
 	GetOriginalUrl(ctx context.Context, shortID string) (string, error)
 }
 
@@ -24,7 +24,7 @@ func NewService(r Repository, c Cache) Service {
 	return &service{repository: r, cache: c}
 }
 
-func (s *service) CreateShortUrl(ctx context.Context, originalUrl, alias string) (string, error) {
+func (s *service) CreateShortUrl(ctx context.Context, originalUrl, alias string, expiry time.Duration) (string, error) {
 	originalUrl = helpers.EnforceHTTP(originalUrl)
 
 	if !helpers.RemoveDomainError(originalUrl) {
@@ -38,9 +38,22 @@ func (s *service) CreateShortUrl(ctx context.Context, originalUrl, alias string)
 		return "", errors.New("short url already exists")
 	}
 
-	if err := s.repository.Create(ctx, originalUrl, shortID); err != nil {
+	// default 3 days
+	if expiry == 0 {
+		expiry = 72
+	}
+	expiresAt := time.Now().Add(expiry * time.Hour)
+
+	if err := s.repository.Create(ctx, originalUrl, shortID, &expiresAt); err != nil {
 		return "", err
 	}
+
+	// cache with same TTL
+	_ = s.cache.Set(ctx, shortID, &URL{
+		OriginalURL: originalUrl,
+		ShortID:     shortID,
+		ExpiresAt:   &expiresAt,
+	}, expiry*time.Hour)
 
 	return buildShortURL(alias, shortID), nil
 }
@@ -59,22 +72,28 @@ func (s *service) GetOriginalUrl(ctx context.Context, shortID string) (string, e
 	// 1. check cache first
 	cached, err := s.cache.Get(ctx, shortID)
 	if err == nil {
+		// check expiry
+		if cached.ExpiresAt != nil && time.Now().After(*cached.ExpiresAt) {
+			return "", errors.New("short url expired")
+		}
 		return cached.OriginalURL, nil
 	}
 
 	// 2. cache miss, hit postgres
-	originalUrl, err := s.repository.GetUrl(ctx, shortID)
+	url, err := s.repository.GetUrl(ctx, shortID)
 	if err != nil {
 		return "", err
 	}
 
-	// 3. populate cache for next time
-	_ = s.cache.Set(ctx, shortID, &URL{
-		OriginalURL: originalUrl,
-		ShortID:     shortID,
-	}, 24*time.Hour)
+	// 3. check expiry
+	if url.ExpiresAt != nil && time.Now().After(*url.ExpiresAt) {
+		return "", errors.New("short url expired")
+	}
 
-	return originalUrl, nil
+	// 4. populate cache for next time
+	_ = s.cache.Set(ctx, shortID, url, time.Until(*url.ExpiresAt))
+
+	return url.OriginalURL, nil
 }
 
 const defaultCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
