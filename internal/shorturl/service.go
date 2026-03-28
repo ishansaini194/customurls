@@ -90,8 +90,14 @@ func (s *service) GetOriginalUrl(ctx context.Context, shortID string) (string, e
 		return "", errors.New("short url expired")
 	}
 
-	// 4. populate cache for next time
-	_ = s.cache.Set(ctx, shortID, url, time.Until(*url.ExpiresAt))
+	// 4. populate cache safely
+	var ttl time.Duration
+	if url.ExpiresAt != nil {
+		ttl = time.Until(*url.ExpiresAt)
+	} else {
+		ttl = 72 * time.Hour
+	}
+	_ = s.cache.Set(ctx, shortID, url, ttl)
 
 	return url.OriginalURL, nil
 }
