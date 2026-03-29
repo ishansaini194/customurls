@@ -13,6 +13,7 @@ type URL struct {
 	ShortID     string     `json:"short_id"     gorm:"uniqueIndex;not null"`
 	CreatedAt   time.Time  `json:"created_at"`
 	ExpiresAt   *time.Time `json:"expires_at"`
+	Hits        int        `json:"hits" gorm:"default:0"`
 }
 
 func Migrate(db *gorm.DB) error {
