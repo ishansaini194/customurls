@@ -68,6 +68,20 @@ func (h *Handler) CreateShortUrl(ctx *fiber.Ctx) error {
 	})
 }
 
+func (h *Handler) GetStats(ctx *fiber.Ctx) error {
+	shortID := ctx.Params("shortID")
+
+	hits, err := h.service.GetHits(ctx.Context(), shortID)
+	if err != nil {
+		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "short url not found"})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"short_id": shortID,
+		"hits":     hits,
+	})
+}
+
 func (h *Handler) Redirect(ctx *fiber.Ctx) error {
 	shortID := ctx.Params("shortID")
 
@@ -78,6 +92,8 @@ func (h *Handler) Redirect(ctx *fiber.Ctx) error {
 		}
 		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "short url not found"})
 	}
+
+	_ = h.service.IncrementHits(ctx.Context(), shortID)
 
 	return ctx.Redirect(url, fiber.StatusMovedPermanently)
 }
