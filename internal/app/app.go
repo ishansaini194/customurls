@@ -41,6 +41,7 @@ func New(cfg *config.Config) (*server.Server, error) {
 	srv := server.New()
 	srv.App.Use(middleware.RateLimit(limiter, cfg.APIQuota))
 	srv.App.Post("/shorten", handler.CreateShortUrl)
+	srv.App.Get("/stats/:shortID", handler.GetStats)
 	srv.App.Get("/:shortID", handler.Redirect)
 	srv.App.Get("/:alias/:shortID", handler.Redirect)
 

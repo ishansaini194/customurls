@@ -13,6 +13,8 @@ import (
 type Service interface {
 	CreateShortUrl(ctx context.Context, originalUrl, alias string, expiry time.Duration) (string, error)
 	GetOriginalUrl(ctx context.Context, shortID string) (string, error)
+	IncrementHits(ctx context.Context, shortID string) error
+	GetHits(ctx context.Context, shortID string) (int, error)
 }
 
 type service struct {
@@ -100,6 +102,14 @@ func (s *service) GetOriginalUrl(ctx context.Context, shortID string) (string, e
 	_ = s.cache.Set(ctx, shortID, url, ttl)
 
 	return url.OriginalURL, nil
+}
+
+func (s *service) IncrementHits(ctx context.Context, shortID string) error {
+	return s.repository.IncrementHits(ctx, shortID)
+}
+
+func (s *service) GetHits(ctx context.Context, shortID string) (int, error) {
+	return s.repository.GetHits(ctx, shortID)
 }
 
 const defaultCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
