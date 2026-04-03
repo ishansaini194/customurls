@@ -37,7 +37,7 @@ const Home = () => {
       if (alias) body.alias = alias;
       if (expiry) body.expiry = parseInt(expiry) * 24; // convert days to hours
 
-      const res = await fetch(`${BACKEND_URL}/api/v1/urls`, {
+      const res = await fetch(`${BACKEND_URL}/shorten`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -50,7 +50,7 @@ const Home = () => {
         return;
       }
 
-      setShortUrl(data.short_url);
+      setShortUrl(data.short);
     } catch (err) {
       setError("Failed to reach the server. Is the backend running?");
     } finally {

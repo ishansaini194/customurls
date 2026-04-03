@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/ishansaini194/customurls/config"
 	"github.com/ishansaini194/customurls/internal/middleware"
 	"github.com/ishansaini194/customurls/internal/platform/redis"
@@ -39,6 +40,13 @@ func New(cfg *config.Config) (*server.Server, error) {
 
 	// server
 	srv := server.New()
+
+	srv.App.Use(cors.New(cors.Config{
+		AllowOrigins: "http://localhost:5173",
+		AllowHeaders: "Origin, Content-Type, Accept",
+		AllowMethods: "GET, POST",
+	}))
+
 	srv.App.Use(middleware.RateLimit(limiter, cfg.APIQuota))
 	srv.App.Post("/shorten", handler.CreateShortUrl)
 	srv.App.Get("/stats/:shortID", handler.GetStats)
