@@ -41,6 +41,13 @@ services:
       redis:
         condition: service_healthy
 
+  frontend:
+    image: nginx:alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    ports:
+      - "3000:80"
+
 volumes:
   postgres_data:
   redis_data:

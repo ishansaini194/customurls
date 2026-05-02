@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/ishansaini194/customurls/config"
 	"github.com/ishansaini194/customurls/internal/middleware"
@@ -53,12 +54,14 @@ func New(cfg *config.Config) (*server.Server, error) {
 	srv.App.Post("/shorten", handler.CreateShortUrl)
 	srv.App.Get("/stats/:shortID", handler.GetStats)
 
-	// Serve frontend static files
-	srv.App.Static("/", "./frontend")
-
-	// Redirect routes AFTER static (so they don't catch index.html etc.)
 	srv.App.Get("/:shortID", handler.Redirect)
 	srv.App.Get("/:alias/:shortID", handler.Redirect)
+
+	// Serve frontend static files
+	srv.App.Static("/", "./frontend", fiber.Static{
+		Index:  "index.html",
+		Browse: false,
+	})
 
 	return srv, nil
 }
