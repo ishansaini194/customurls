@@ -1,13 +1,349 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="customurls.in — Shorten links, generate QR codes, and track clicks." />
+  <title>customurls.in — Link Shortener</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23E87722'/><text x='6' y='23' font-size='18' font-family='serif' font-weight='bold' fill='white'>u</text></svg>" />
+
+  <!-- QR Code library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+  <!-- Workaround: qrcodejs targets canvas via id, we use qrcode.js from a better CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js" defer></script>
+
+  <style>
+    /* Inline animations for hero fade-in */
+    [data-animate] {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    .anim-in {
+      animation: heroIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes heroIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Nav ──────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">
+        <span class="nav-logo-mark">
+          <svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 1L13 7L7 13M1 7h12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </span>
+        <span class="nav-logo-text">custom<span class="nav-logo-tld">urls</span>.in</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="https://github.com/ishansaini194/customurls" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Hero ─────────────────────────────────────────────────────── -->
+  <section class="hero">
+
+    <!-- Left: copy -->
+    <div class="hero-left">
+      <p class="hero-eyebrow" data-animate>URL Shortener</p>
+      <h1 class="hero-title" data-animate>
+        Short links,<br><em>big impact</em>
+      </h1>
+      <p class="hero-sub" data-animate>
+        Shorten any URL, generate a QR code, and track every click —
+        all in one place. Fast, free, and no account needed.
+      </p>
+      <div class="hero-stats" data-animate>
+        <div class="stat-item">
+          <div class="stat-num">∞</div>
+          <div class="stat-label">Links</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">0ms</div>
+          <div class="stat-label">Redirects</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">Free</div>
+          <div class="stat-label">Always</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: app card -->
+    <div class="hero-right" data-animate>
+      <div class="app-card">
+
+        <!-- Tab bar -->
+        <div class="tab-bar" role="tablist">
+          <button class="tab-btn active" data-panel="panel-shorten" role="tab" aria-selected="true">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M10 6l-4 4M6.5 4.5a2.5 2.5 0 013.536 3.536L8.5 9.5M9.5 6.5a2.5 2.5 0 01-3.536-3.536L7.5 1.5"/>
+            </svg>
+            Shorten
+          </button>
+          <button class="tab-btn" data-panel="panel-qr" role="tab" aria-selected="false">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="2" width="5" height="5" rx="0.5"/>
+              <rect x="9" y="2" width="5" height="5" rx="0.5"/>
+              <rect x="2" y="9" width="5" height="5" rx="0.5"/>
+              <rect x="10" y="10" width="1.5" height="1.5"/>
+              <rect x="12.5" y="10" width="1.5" height="1.5"/>
+              <rect x="10" y="12.5" width="1.5" height="1.5"/>
+              <rect x="12.5" y="12.5" width="1.5" height="1.5"/>
+            </svg>
+            QR Code
+          </button>
+          <button class="tab-btn" data-panel="panel-stats" role="tab" aria-selected="false">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12l3-4 3 2 3-5 3 3"/>
+            </svg>
+            Stats
+          </button>
+        </div>
+
+        <!-- ── Panel: Shorten ─────────────────────────────────────── -->
+        <div class="tab-panel active" id="panel-shorten" role="tabpanel">
+          <form id="shorten-form" novalidate>
+
+            <div class="form-group">
+              <label class="form-label" for="url-input">Original URL</label>
+              <input
+                id="url-input"
+                class="form-input"
+                type="url"
+                placeholder="https://example.com/very/long/path"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="alias-input">Custom alias</label>
+                <input
+                  id="alias-input"
+                  class="form-input"
+                  type="text"
+                  placeholder="my-link"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <p class="form-hint">Optional</p>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="expiry-input">Expiry (days)</label>
+                <input
+                  id="expiry-input"
+                  class="form-input"
+                  type="number"
+                  placeholder="30"
+                  min="1"
+                  max="3650"
+                />
+                <p class="form-hint">Optional — default: 3 days</p>
+              </div>
+            </div>
+
+            <div id="shorten-error" class="error-msg"></div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 4px;">
+              <span id="shorten-btn-text">Shorten URL</span>
+              <div id="shorten-spinner" class="spinner"></div>
+            </button>
+
+          </form>
+
+          <!-- Result -->
+          <div id="shorten-result" class="result-card">
+            <div class="result-label">Your short link</div>
+            <div class="result-url-row">
+              <span id="result-url" class="result-url"></span>
+              <div class="result-actions">
+                <button id="copy-result-btn" class="btn btn-icon" title="Copy">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                    <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+                    <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/>
+                  </svg>
+                </button>
+                <button id="open-result-btn" class="btn btn-icon" title="Open link">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                    <path d="M7 3H3.5A1.5 1.5 0 002 4.5v8A1.5 1.5 0 003.5 14h8A1.5 1.5 0 0013 12.5V9"/>
+                    <path d="M10 2h4v4M14 2l-7 7"/>
+                  </svg>
+                </button>
+                <button id="goto-qr-btn" class="btn btn-icon" title="Generate QR">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="5" height="5"/>
+                    <rect x="9" y="2" width="5" height="5"/>
+                    <rect x="2" y="9" width="5" height="5"/>
+                    <rect x="10" y="10" width="1.5" height="1.5"/>
+                    <rect x="12.5" y="12.5" width="1.5" height="1.5"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Panel: QR Code ─────────────────────────────────────── -->
+        <div class="tab-panel" id="panel-qr" role="tabpanel">
+          <form id="qr-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="qr-url-input">Short URL or any URL</label>
+              <input
+                id="qr-url-input"
+                class="form-input"
+                type="url"
+                placeholder="https://customurls.in/abc123"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div id="qr-error" class="error-msg"></div>
+            <button type="submit" class="btn btn-primary" style="margin-top: 4px;">
+              Generate QR Code
+            </button>
+          </form>
+
+          <div id="qr-output" class="qr-output">
+            <div class="qr-canvas-wrap">
+              <canvas id="qr-canvas"></canvas>
+            </div>
+            <div class="qr-actions">
+              <button id="qr-download-btn" class="btn btn-ghost">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M8 2v8M5 7l3 3 3-3M2 12v1.5A1.5 1.5 0 003.5 15h9a1.5 1.5 0 001.5-1.5V12"/>
+                </svg>
+                Download PNG
+              </button>
+              <button id="qr-copy-img-btn" class="btn btn-ghost">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+                  <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/>
+                </svg>
+                Copy Image
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Panel: Stats ───────────────────────────────────────── -->
+        <div class="tab-panel" id="panel-stats" role="tabpanel">
+          <form id="stats-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="stats-input">Short ID or full short URL</label>
+              <input
+                id="stats-input"
+                class="form-input"
+                type="text"
+                placeholder="abc123  or  https://customurls.in/abc123"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div id="stats-error" class="error-msg"></div>
+            <button type="submit" class="btn btn-primary" style="margin-top:4px;">
+              <span id="stats-btn-text">Get Stats</span>
+              <div id="stats-spinner" class="spinner"></div>
+            </button>
+          </form>
+
+          <div id="stats-result" class="stats-result">
+            <div class="stats-grid">
+              <div class="stats-tile">
+                <div class="stats-tile-num" id="stat-hits">—</div>
+                <div class="stats-tile-label">Total Clicks</div>
+              </div>
+              <div class="stats-tile">
+                <div class="stats-tile-num" id="stat-expiry">—</div>
+                <div class="stats-tile-label">Expires In</div>
+              </div>
+            </div>
+            <div class="stats-url-info">
+              <div class="stats-url-row">
+                <span class="stats-url-key">Short</span>
+                <span class="stats-url-val" id="stat-shortid">—</span>
+              </div>
+              <div class="stats-url-row">
+                <span class="stats-url-key">Target</span>
+                <span class="stats-url-val" id="stat-original">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /app-card -->
+    </div><!-- /hero-right -->
+  </section>
+
+  <hr class="divider" style="max-width:1100px;margin:48px auto 0;" />
+
+  <!-- ── How It Works ─────────────────────────────────────────────── -->
+  <section class="how-section" id="how">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2 class="section-title">How it works</h2>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          </svg>
+        </div>
+        <div class="step-num">Step 01</div>
+        <h3 class="step-title">Paste your URL</h3>
+        <p class="step-desc">Drop in any long URL. Add an optional custom alias and expiry date.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <div class="step-num">Step 02</div>
+        <h3 class="step-title">Get your short link</h3>
+        <p class="step-desc">Your shortened URL is ready instantly. Copy it, open it, or turn it into a QR code.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="step-num">Step 03</div>
+        <h3 class="step-title">Track every click</h3>
+        <p class="step-desc">Check the Stats tab anytime to see how many times your link has been visited.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ───────────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">custom<span>urls</span>.in</div>
+      <p class="footer-copy">Built with Go + Redis · Open Source</p>
+      <ul class="footer-links">
+        <li><a href="#how">Docs</a></li>
+        <li><a href="https://github.com/ishansaini194/customurls" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- ── Toast ─────────────────────────────────────────────────────── -->
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <span class="toast-dot"></span>
+    <span class="toast-text"></span>
+  </div>
+
+  <script src="script.js"></script>
+</body>
 </html>
