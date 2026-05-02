@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -54,14 +55,25 @@ func New(cfg *config.Config) (*server.Server, error) {
 	srv.App.Post("/shorten", handler.CreateShortUrl)
 	srv.App.Get("/stats/:shortID", handler.GetStats)
 
-	srv.App.Get("/:shortID", handler.Redirect)
-	srv.App.Get("/:alias/:shortID", handler.Redirect)
-
-	// Serve frontend static files
+	// ✅ Serve frontend FIRST
 	srv.App.Static("/", "./frontend", fiber.Static{
 		Index:  "index.html",
 		Browse: false,
 	})
+
+	// ✅ Redirect routes AFTER static + skip files
+	srv.App.Get("/:shortID", func(c *fiber.Ctx) error {
+		shortID := c.Params("shortID")
+
+		// Skip static assets like .css, .js, .png, etc.
+		if strings.Contains(shortID, ".") {
+			return c.Next()
+		}
+
+		return handler.Redirect(c)
+	})
+
+	srv.App.Get("/:alias/:shortID", handler.Redirect)
 
 	return srv, nil
 }
