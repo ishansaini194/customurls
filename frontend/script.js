@@ -1,6 +1,6 @@
 /* ─── Config ──────────────────────────────────────────────────────── */
 // In production, set BACKEND_URL to your actual API domain
-const BACKEND_URL = 'http://localhost:8080';
+const BACKEND_URL = window.location.origin;
 
 /* ─── QR Library (inline minimal) ────────────────────────────────── */
 // We load qrcode.js from CDN, it's injected in HTML
