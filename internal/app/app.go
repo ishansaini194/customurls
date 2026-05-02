@@ -42,14 +42,21 @@ func New(cfg *config.Config) (*server.Server, error) {
 	srv := server.New()
 
 	srv.App.Use(cors.New(cors.Config{
-		AllowOrigins: "http://localhost:5173",
+		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept",
 		AllowMethods: "GET, POST",
 	}))
 
 	srv.App.Use(middleware.RateLimit(limiter, cfg.APIQuota))
+
+	// API routes
 	srv.App.Post("/shorten", handler.CreateShortUrl)
 	srv.App.Get("/stats/:shortID", handler.GetStats)
+
+	// Serve frontend static files
+	srv.App.Static("/", "./frontend")
+
+	// Redirect routes AFTER static (so they don't catch index.html etc.)
 	srv.App.Get("/:shortID", handler.Redirect)
 	srv.App.Get("/:alias/:shortID", handler.Redirect)
 
