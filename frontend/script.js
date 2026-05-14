@@ -386,12 +386,30 @@ function initHistory() {
   renderHistory();
 }
 
+/* ─── CLI install copy button ─────────────────────────────────────── */
+function initCLICopy() {
+  const btn = $('cli-copy-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const cmd = $('cli-install-cmd').textContent.trim();
+    try {
+      await navigator.clipboard.writeText(cmd);
+      btn.classList.add('copied');
+      toast('Install command copied');
+      setTimeout(() => btn.classList.remove('copied'), 1500);
+    } catch {
+      toast('Copy failed — select manually');
+    }
+  });
+}
+
 /* ─── Boot ────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initShorten();
   initStats();
   initHistory();
+  initCLICopy();
 
   document.querySelectorAll('[data-animate]').forEach((el, i) => {
     el.style.animationDelay = `${i * 80}ms`;

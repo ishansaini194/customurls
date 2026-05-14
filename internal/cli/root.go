@@ -16,8 +16,8 @@ Shorten URLs, use custom aliases, and check click stats —
 all without leaving your terminal.
 
 Examples:
-  custom short "https://example.com/very/long/url"
-  custom short "https://example.com" --alias my-link
+  custom short https://example.com/very/long/url
+  custom short https://example.com --alias my-link
   custom stats my-link`,
 	SilenceUsage:  true,
 	SilenceErrors: true,

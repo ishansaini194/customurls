@@ -17,7 +17,7 @@ var (
 
 var shortenCmd = &cobra.Command{
 	Use:   "short <url>",
-	Short: "Short a URL",
+	Short: "Shorten a URL",
 	Long: `Shorten a URL and print the short link.
 
 Use --alias to choose a custom short ID instead of a random one.
