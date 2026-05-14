@@ -71,14 +71,17 @@ func (h *Handler) CreateShortUrl(ctx *fiber.Ctx) error {
 func (h *Handler) GetStats(ctx *fiber.Ctx) error {
 	shortID := ctx.Params("shortID")
 
-	hits, err := h.service.GetHits(ctx.Context(), shortID)
+	url, err := h.service.GetStats(ctx.Context(), shortID)
 	if err != nil {
 		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "short url not found"})
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-		"short_id": shortID,
-		"hits":     hits,
+		"short_id":     url.ShortID,
+		"hits":         url.Hits,
+		"original_url": url.OriginalURL,
+		"created_at":   url.CreatedAt,
+		"expires_at":   url.ExpiresAt,
 	})
 }
 

@@ -15,6 +15,7 @@ type Service interface {
 	GetOriginalUrl(ctx context.Context, shortID string) (string, error)
 	IncrementHits(ctx context.Context, shortID string) error
 	GetHits(ctx context.Context, shortID string) (int, error)
+	GetStats(ctx context.Context, shortID string) (*URL, error)
 }
 
 type service struct {
@@ -110,6 +111,11 @@ func (s *service) IncrementHits(ctx context.Context, shortID string) error {
 
 func (s *service) GetHits(ctx context.Context, shortID string) (int, error) {
 	return s.repository.GetHits(ctx, shortID)
+}
+
+// GetStats returns the full URL record for a short ID.
+func (s *service) GetStats(ctx context.Context, shortID string) (*URL, error) {
+	return s.repository.GetUrl(ctx, shortID)
 }
 
 const defaultCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
