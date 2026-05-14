@@ -14,8 +14,8 @@ var (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the cshort version",
+	Short: "Print the custom version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("cshort %s (commit %s)\n", version, commit)
+		fmt.Printf("custom %s (commit %s)\n", version, commit)
 	},
 }

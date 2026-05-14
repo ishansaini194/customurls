@@ -16,8 +16,8 @@ var (
 )
 
 var shortenCmd = &cobra.Command{
-	Use:   "shorten <url>",
-	Short: "Shorten a URL",
+	Use:   "short <url>",
+	Short: "Short a URL",
 	Long: `Shorten a URL and print the short link.
 
 Use --alias to choose a custom short ID instead of a random one.
@@ -25,10 +25,10 @@ Use --qr to also print a scannable QR code in the terminal.
 Use --json to print the full response as JSON (useful for scripts).
 
 Examples:
-  cshort shorten https://example.com/very/long/url
-  cshort shorten https://example.com --alias my-link
-  cshort shorten https://example.com --qr
-  cshort shorten https://example.com --json`,
+  custom short https://example.com/very/long/url
+  custom short https://example.com --alias my-link
+  custom short https://example.com --qr
+  custom short https://example.com --json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		input := args[0]

@@ -8,22 +8,22 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "cshort",
+	Use:   "custom",
 	Short: "Shorten URLs from your terminal",
-	Long: `cshort is a command-line client for customurls.in.
+	Long: `custom is a command-line client for customurls.in.
 
 Shorten URLs, use custom aliases, and check click stats —
 all without leaving your terminal.
 
 Examples:
-  cshort shorten https://example.com/very/long/url
-  cshort shorten https://example.com --alias my-link
-  cshort stats my-link`,
+  custom short "https://example.com/very/long/url"
+  custom short "https://example.com" --alias my-link
+  custom stats my-link`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
 
-// Execute runs the root command. Called by cmd/cshort/main.go.
+// Execute runs the root command. Called by cmd/custom/main.go.
 func Execute() {
 	rootCmd.AddCommand(shortenCmd)
 	rootCmd.AddCommand(statsCmd)

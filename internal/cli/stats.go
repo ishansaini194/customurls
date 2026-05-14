@@ -16,15 +16,15 @@ var statsCmd = &cobra.Command{
 	Short: "Show click stats for a short URL",
 	Long: `Show stats for a short URL: total clicks, original URL, and expiry.
 
-You can pass any of these and cshort will figure out the short ID:
+You can pass any of these and custom will figure out the short ID:
   - the bare short ID:        8pFVcr
   - the alias + ID path:      s26-blue/8pFVcr
   - the full short URL:       https://customurls.in/s26-blue/8pFVcr
 
 Examples:
-  cshort stats 8pFVcr
-  cshort stats s26-blue/8pFVcr
-  cshort stats https://customurls.in/s26-blue/8pFVcr --json`,
+  custom stats 8pFVcr
+  custom stats s26-blue/8pFVcr
+  custom stats https://customurls.in/s26-blue/8pFVcr --json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		shortID := extractShortID(args[0])
