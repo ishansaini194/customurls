@@ -549,8 +549,11 @@ body {
   margin-bottom: 14px;
 }
 
-#qr-canvas {
+#qr-image {
   display: block;
+  max-width: 240px;
+  width: 100%;
+  height: auto;
 }
 
 .qr-actions {
@@ -704,10 +707,11 @@ body {
   padding: 3px;
 }
 
-.history-qr canvas {
-  width: 100% !important;
-  height: 100% !important;
+.history-qr img {
+  width: 100%;
+  height: 100%;
   display: block;
+  object-fit: contain;
 }
 
 /* Middle info block */

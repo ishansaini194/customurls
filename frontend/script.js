@@ -68,6 +68,14 @@ function extractShortID(raw) {
   return parts[parts.length - 1];
 }
 
+// Build the backend QR endpoint URL for a given short URL string.
+// The QR endpoint takes the short ID (last path segment).
+function qrEndpoint(shortUrl, size) {
+  const id = extractShortID(shortUrl);
+  const sz = size ? `?size=${size}` : '';
+  return `${BACKEND_URL}/qr/${encodeURIComponent(id)}${sz}`;
+}
+
 /* ─── Tabs ────────────────────────────────────────────────────────── */
 function initTabs() {
   const tabs = document.querySelectorAll('.tab-btn');
@@ -99,7 +107,7 @@ function initShorten() {
   const openBtn = $('open-result-btn');
   const qrBtn = $('qr-btn');
   const qrOutput = $('qr-output');
-  const qrCanvas = $('qr-canvas');
+  const qrImage = $('qr-image');
   const qrDownload = $('qr-download-btn');
 
   let currentShortUrl = '';
@@ -180,43 +188,22 @@ function initShorten() {
     }
   });
 
-  // QR button — generates QR for the last shortened link, inline
+  // QR button — shows QR for the last shortened link (from the backend /qr endpoint)
   qrBtn.addEventListener('click', () => {
     if (!currentShortUrl) return;
     if (qrOutput.classList.contains('show')) {
       hide(qrOutput);
       return;
     }
-    renderQR(qrCanvas, currentShortUrl, 200, () => show(qrOutput));
-  });
-
-  qrDownload.addEventListener('click', () => {
-    const link = document.createElement('a');
-    link.download = 'customurl-qr.png';
-    link.href = qrCanvas.toDataURL('image/png');
-    link.click();
+    qrImage.src = qrEndpoint(currentShortUrl, 240);
+    qrImage.onerror = () => toast('Failed to load QR code');
+    qrDownload.href = qrEndpoint(currentShortUrl, 512);
+    show(qrOutput);
   });
 
   copyBtn.addEventListener('click', () => copyText(currentShortUrl));
   openBtn.addEventListener('click', () => {
     if (currentShortUrl) window.open(currentShortUrl, '_blank', 'noopener');
-  });
-}
-
-/* ─── QR rendering helper ─────────────────────────────────────────── */
-function renderQR(canvas, text, size, onDone) {
-  if (typeof QRCode === 'undefined') {
-    toast('QR library not loaded');
-    return;
-  }
-  QRCode.toCanvas(canvas, text, {
-    width: size,
-    margin: 2,
-    color: { dark: '#1A1714', light: '#FFFFFF' },
-    errorCorrectionLevel: 'M',
-  }, err => {
-    if (err) { toast('Failed to generate QR'); return; }
-    if (onDone) onDone();
   });
 }
 
@@ -341,11 +328,13 @@ function renderHistory() {
     const row = document.createElement('div');
     row.className = 'history-item';
 
-    // QR thumbnail
+    // QR thumbnail — loaded from the backend /qr endpoint
     const qrWrap = document.createElement('div');
     qrWrap.className = 'history-qr';
-    const qrCanvas = document.createElement('canvas');
-    qrWrap.appendChild(qrCanvas);
+    const qrImg = document.createElement('img');
+    qrImg.alt = 'QR';
+    qrImg.src = qrEndpoint(item.short, 120);
+    qrWrap.appendChild(qrImg);
 
     // Info block
     const info = document.createElement('div');
@@ -384,9 +373,6 @@ function renderHistory() {
     row.appendChild(info);
     row.appendChild(actions);
     listEl.appendChild(row);
-
-    // Render the QR thumbnail into its canvas
-    renderQR(qrCanvas, item.short, 56);
   });
 }
 
