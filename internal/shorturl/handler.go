@@ -1,10 +1,12 @@
 package shorturl
 
 import (
+	"os"
 	"time"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/gofiber/fiber/v2"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 type Handler struct {
@@ -83,6 +85,53 @@ func (h *Handler) GetStats(ctx *fiber.Ctx) error {
 		"created_at":   url.CreatedAt,
 		"expires_at":   url.ExpiresAt,
 	})
+}
+
+// GetQR returns a PNG QR code that encodes the short URL for the given shortID.
+// Optional query param ?size=NNN sets the pixel size (clamped to 64..1024).
+func (h *Handler) GetQR(ctx *fiber.Ctx) error {
+	shortID := ctx.Params("shortID")
+
+	// Confirm the short URL exists (and isn't expired) before generating a QR.
+	url, err := h.service.GetStats(ctx.Context(), shortID)
+	if err != nil {
+		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "short url not found"})
+	}
+	if url.ExpiresAt != nil && url.ExpiresAt.Before(time.Now()) {
+		return ctx.Status(fiber.StatusGone).JSON(fiber.Map{"error": "short url expired"})
+	}
+
+	// Size handling: default 256, clamp to a sane range.
+	size := ctx.QueryInt("size", 256)
+	if size < 64 {
+		size = 64
+	}
+	if size > 1024 {
+		size = 1024
+	}
+
+	// The QR encodes the canonical redirect URL: DOMAIN/shortID
+	target := buildQRTarget(url.ShortID)
+
+	png, err := qrcode.Encode(target, qrcode.Medium, size)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate qr"})
+	}
+
+	ctx.Set("Content-Type", "image/png")
+	ctx.Set("Cache-Control", "public, max-age=86400")
+	return ctx.Send(png)
+}
+
+// buildQRTarget builds the full short URL the QR should point to.
+func buildQRTarget(shortID string) string {
+	domain := os.Getenv("DOMAIN")
+	scheme := "https://"
+	// localhost is plain http during development
+	if len(domain) >= 9 && domain[:9] == "localhost" {
+		scheme = "http://"
+	}
+	return scheme + domain + "/" + shortID
 }
 
 func (h *Handler) Redirect(ctx *fiber.Ctx) error {

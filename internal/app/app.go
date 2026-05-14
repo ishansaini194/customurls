@@ -54,6 +54,7 @@ func New(cfg *config.Config) (*server.Server, error) {
 	// API routes
 	srv.App.Post("/shorten", handler.CreateShortUrl)
 	srv.App.Get("/stats/:shortID", handler.GetStats)
+	srv.App.Get("/qr/:shortID", handler.GetQR)
 
 	// ✅ Serve frontend FIRST
 	srv.App.Static("/", "./frontend", fiber.Static{
