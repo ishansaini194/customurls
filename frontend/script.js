@@ -1,9 +1,7 @@
 /* ─── Config ──────────────────────────────────────────────────────── */
-// In production, set BACKEND_URL to your actual API domain
 const BACKEND_URL = window.location.origin;
-
-/* ─── QR Library (inline minimal) ────────────────────────────────── */
-// We load qrcode.js from CDN, it's injected in HTML
+const HISTORY_KEY = 'customurls_history';
+const HISTORY_MAX = 20;
 
 /* ─── Utility ─────────────────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
@@ -26,6 +24,50 @@ async function copyText(text) {
   }
 }
 
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function truncate(str, max) {
+  return str.length <= max ? str : str.slice(0, max) + '…';
+}
+
+// Expiry comes from /shorten as hours; from /stats as an ISO timestamp.
+function formatExpiryHours(hours) {
+  if (!hours || hours === 0) return 'Never';
+  const h = Number(hours);
+  if (h >= 8760) return `${Math.round(h / 8760)}y`;
+  if (h >= 720) return `${Math.round(h / 720)}mo`;
+  if (h >= 24) return `${Math.round(h / 24)}d`;
+  return `${h}h`;
+}
+
+function formatExpiryDate(iso) {
+  if (!iso) return 'Never';
+  const then = new Date(iso);
+  const diffMs = then - Date.now();
+  if (diffMs <= 0) return 'Expired';
+  const days = Math.floor(diffMs / 86400000);
+  const hrs = Math.floor((diffMs % 86400000) / 3600000);
+  if (days > 0) return `${days}d ${hrs}h`;
+  return `${hrs}h`;
+}
+
+// Extract the short ID (last path segment) from any input form.
+function extractShortID(raw) {
+  let s = raw.trim();
+  try {
+    const parsed = new URL(s);
+    s = parsed.pathname;
+  } catch { /* not a URL — treat as raw */ }
+  s = s.replace(/^\/+|\/+$/g, '');
+  if (!s) return '';
+  const parts = s.split('/');
+  return parts[parts.length - 1];
+}
+
 /* ─── Tabs ────────────────────────────────────────────────────────── */
 function initTabs() {
   const tabs = document.querySelectorAll('.tab-btn');
@@ -33,28 +75,32 @@ function initTabs() {
 
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('active'));
+      tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
       panels.forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
       $(tab.dataset.panel).classList.add('active');
     });
   });
 }
 
-/* ─── Shorten Tab ─────────────────────────────────────────────────── */
+/* ─── Shorten + inline QR ─────────────────────────────────────────── */
 function initShorten() {
-  const form        = $('shorten-form');
-  const urlInput    = $('url-input');
-  const aliasInput  = $('alias-input');
+  const form = $('shorten-form');
+  const urlInput = $('url-input');
+  const aliasInput = $('alias-input');
   const expiryInput = $('expiry-input');
-  const btnText     = $('shorten-btn-text');
-  const spinner     = $('shorten-spinner');
-  const errorEl     = $('shorten-error');
-  const resultCard  = $('shorten-result');
-  const resultUrl   = $('result-url');
-  const copyBtn     = $('copy-result-btn');
-  const openBtn     = $('open-result-btn');
-  const qrBtn       = $('goto-qr-btn');
+  const btnText = $('shorten-btn-text');
+  const spinner = $('shorten-spinner');
+  const errorEl = $('shorten-error');
+  const resultCard = $('shorten-result');
+  const resultUrl = $('result-url');
+  const copyBtn = $('copy-result-btn');
+  const openBtn = $('open-result-btn');
+  const qrBtn = $('qr-btn');
+  const qrOutput = $('qr-output');
+  const qrCanvas = $('qr-canvas');
+  const qrDownload = $('qr-download-btn');
 
   let currentShortUrl = '';
 
@@ -62,10 +108,11 @@ function initShorten() {
     e.preventDefault();
     hide(errorEl);
     hide(resultCard);
+    hide(qrOutput);
     urlInput.classList.remove('error');
 
-    const url    = urlInput.value.trim();
-    const alias  = aliasInput.value.trim();
+    const url = urlInput.value.trim();
+    const alias = aliasInput.value.trim();
     const expiry = expiryInput.value.trim();
 
     if (!url) {
@@ -82,7 +129,6 @@ function initShorten() {
       return;
     }
 
-    // UI: loading state
     btnText.textContent = 'Shortening…';
     spinner.classList.add('show');
     form.querySelector('button[type=submit]').disabled = true;
@@ -92,12 +138,11 @@ function initShorten() {
       if (alias) body.alias = alias;
       if (expiry) body.expiry = parseInt(expiry) * 24; // days → hours
 
-      const res  = await fetch(`${BACKEND_URL}/shorten`, {
+      const res = await fetch(`${BACKEND_URL}/shorten`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-
       const data = await res.json();
 
       if (!res.ok) {
@@ -109,6 +154,20 @@ function initShorten() {
       currentShortUrl = data.short;
       resultUrl.textContent = data.short;
       show(resultCard);
+
+      // QR button is now usable
+      qrBtn.disabled = false;
+      qrBtn.title = 'Generate QR code';
+
+      // Save to history
+      addToHistory({
+        short: data.short,
+        original: data.url || url,
+        expiry: data.expiry,            // hours
+        clicks: 0,
+        savedAt: Date.now(),
+      });
+
       resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     } catch {
@@ -121,128 +180,63 @@ function initShorten() {
     }
   });
 
-  copyBtn.addEventListener('click', () => copyText(currentShortUrl));
-
-  openBtn.addEventListener('click', () => {
-    if (currentShortUrl) window.open(currentShortUrl, '_blank', 'noopener');
-  });
-
+  // QR button — generates QR for the last shortened link, inline
   qrBtn.addEventListener('click', () => {
     if (!currentShortUrl) return;
-    // Switch to QR tab and pre-fill
-    document.querySelector('[data-panel="panel-qr"]').click();
-    $('qr-url-input').value = currentShortUrl;
-    generateQR(currentShortUrl);
-  });
-}
-
-/* ─── QR Tab ──────────────────────────────────────────────────────── */
-function initQR() {
-  const form      = $('qr-form');
-  const input     = $('qr-url-input');
-  const output    = $('qr-output');
-  const canvas    = $('qr-canvas');
-  const dlBtn     = $('qr-download-btn');
-  const copyImgBtn = $('qr-copy-img-btn');
-  const errorEl   = $('qr-error');
-
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    hide(errorEl);
-    const url = input.value.trim();
-    if (!url) {
-      errorEl.textContent = 'Enter a URL to generate a QR code.';
-      show(errorEl);
+    if (qrOutput.classList.contains('show')) {
+      hide(qrOutput);
       return;
     }
-    generateQR(url);
+    renderQR(qrCanvas, currentShortUrl, 200, () => show(qrOutput));
   });
 
-  dlBtn.addEventListener('click', () => {
+  qrDownload.addEventListener('click', () => {
     const link = document.createElement('a');
     link.download = 'customurl-qr.png';
-    link.href = canvas.toDataURL('image/png');
+    link.href = qrCanvas.toDataURL('image/png');
     link.click();
   });
 
-  copyImgBtn.addEventListener('click', async () => {
-    canvas.toBlob(async blob => {
-      try {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        toast('QR image copied');
-      } catch {
-        toast('Copy failed — use Download instead');
-      }
-    });
+  copyBtn.addEventListener('click', () => copyText(currentShortUrl));
+  openBtn.addEventListener('click', () => {
+    if (currentShortUrl) window.open(currentShortUrl, '_blank', 'noopener');
   });
 }
 
-function generateQR(url) {
-  const output  = $('qr-output');
-  const canvas  = $('qr-canvas');
-  const errorEl = $('qr-error');
-
-  hide(errorEl);
-
+/* ─── QR rendering helper ─────────────────────────────────────────── */
+function renderQR(canvas, text, size, onDone) {
   if (typeof QRCode === 'undefined') {
-    errorEl.textContent = 'QR library not loaded. Check your connection.';
-    show(errorEl);
+    toast('QR library not loaded');
     return;
   }
-
-  try {
-    QRCode.toCanvas(canvas, url, {
-      width: 200,
-      margin: 2,
-      color: {
-        dark:  '#1A1714',
-        light: '#FFFFFF',
-      },
-      errorCorrectionLevel: 'M',
-    }, err => {
-      if (err) {
-        errorEl.textContent = 'Failed to generate QR: ' + err.message;
-        show(errorEl);
-        return;
-      }
-      show(output);
-    });
-  } catch (err) {
-    errorEl.textContent = 'QR generation failed.';
-    show(errorEl);
-  }
+  QRCode.toCanvas(canvas, text, {
+    width: size,
+    margin: 2,
+    color: { dark: '#1A1714', light: '#FFFFFF' },
+    errorCorrectionLevel: 'M',
+  }, err => {
+    if (err) { toast('Failed to generate QR'); return; }
+    if (onDone) onDone();
+  });
 }
 
-/* ─── Stats Tab ───────────────────────────────────────────────────── */
+/* ─── Stats ───────────────────────────────────────────────────────── */
 function initStats() {
-  const form      = $('stats-form');
-  const input     = $('stats-input');
-  const spinner   = $('stats-spinner');
-  const btnText   = $('stats-btn-text');
-  const errorEl   = $('stats-error');
-  const result    = $('stats-result');
+  const form = $('stats-form');
+  const input = $('stats-input');
+  const spinner = $('stats-spinner');
+  const btnText = $('stats-btn-text');
+  const errorEl = $('stats-error');
+  const result = $('stats-result');
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
     hide(errorEl);
     hide(result);
 
-    const raw = input.value.trim();
-    if (!raw) {
-      errorEl.textContent = 'Enter a short ID or full short URL.';
-      show(errorEl);
-      return;
-    }
-
-    // Extract the short ID — handle both "abc123" and "https://customurls.in/abc123"
-    let shortID = raw;
-    try {
-      const parsed = new URL(raw);
-      shortID = parsed.pathname.replace(/^\//, '');
-    } catch { /* not a URL, treat as raw ID */ }
-
+    const shortID = extractShortID(input.value);
     if (!shortID) {
-      errorEl.textContent = 'Could not extract a short ID from that input.';
+      errorEl.textContent = 'Enter a short ID or full short URL.';
       show(errorEl);
       return;
     }
@@ -252,7 +246,7 @@ function initStats() {
     form.querySelector('button[type=submit]').disabled = true;
 
     try {
-      const res  = await fetch(`${BACKEND_URL}/stats/${encodeURIComponent(shortID)}`);
+      const res = await fetch(`${BACKEND_URL}/stats/${encodeURIComponent(shortID)}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -261,15 +255,17 @@ function initStats() {
         return;
       }
 
-      // Populate stats UI
-      $('stat-hits').textContent     = data.hits ?? data.clicks ?? '—';
-      $('stat-expiry').textContent   = formatExpiry(data.expiry);
-      $('stat-original').innerHTML   = data.url
-        ? `<a href="${escHtml(data.url)}" target="_blank" rel="noopener">${escHtml(truncate(data.url, 60))}</a>`
+      $('stat-hits').textContent = data.hits ?? 0;
+      $('stat-expiry').textContent = formatExpiryDate(data.expires_at);
+      $('stat-shortid').textContent = data.short_id || shortID;
+      $('stat-original').innerHTML = data.original_url
+        ? `<a href="${escHtml(data.original_url)}" target="_blank" rel="noopener">${escHtml(truncate(data.original_url, 70))}</a>`
         : '—';
-      $('stat-shortid').textContent  = shortID;
 
       show(result);
+
+      // If this link is in history, refresh its click count
+      updateHistoryClicks(data.short_id || shortID, data.hits ?? 0);
 
     } catch {
       errorEl.textContent = 'Cannot reach the server. Is the backend running?';
@@ -282,31 +278,135 @@ function initStats() {
   });
 }
 
-function formatExpiry(hours) {
-  if (!hours || hours === 0) return 'Never';
-  const h = Number(hours);
-  if (h >= 8760) return `${Math.round(h / 8760)}y`;
-  if (h >= 720)  return `${Math.round(h / 720)}mo`;
-  if (h >= 24)   return `${Math.round(h / 24)}d`;
-  return `${h}h`;
+/* ─── History (localStorage) ──────────────────────────────────────── */
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
 }
 
-function escHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function saveHistory(list) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+  } catch {
+    // localStorage full or disabled — fail silently
+  }
 }
 
-function truncate(str, max) {
-  return str.length <= max ? str : str.slice(0, max) + '…';
+function addToHistory(item) {
+  let list = loadHistory();
+  // De-dupe by short URL — newest wins, moves to top
+  list = list.filter(x => x.short !== item.short);
+  list.unshift(item);
+  if (list.length > HISTORY_MAX) list = list.slice(0, HISTORY_MAX);
+  saveHistory(list);
+  renderHistory();
+}
+
+function updateHistoryClicks(shortID, clicks) {
+  const list = loadHistory();
+  let changed = false;
+  list.forEach(item => {
+    // Compare the last path segment of the stored short URL to shortID exactly.
+    if (extractShortID(item.short) === shortID) {
+      item.clicks = clicks;
+      changed = true;
+    }
+  });
+  if (changed) { saveHistory(list); renderHistory(); }
+}
+
+function removeHistoryItem(short) {
+  const list = loadHistory().filter(x => x.short !== short);
+  saveHistory(list);
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = loadHistory();
+  const listEl = $('history-list');
+  const emptyEl = $('history-empty');
+
+  listEl.innerHTML = '';
+
+  if (list.length === 0) {
+    show(emptyEl);
+    return;
+  }
+  hide(emptyEl);
+
+  list.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+
+    // QR thumbnail
+    const qrWrap = document.createElement('div');
+    qrWrap.className = 'history-qr';
+    const qrCanvas = document.createElement('canvas');
+    qrWrap.appendChild(qrCanvas);
+
+    // Info block
+    const info = document.createElement('div');
+    info.className = 'history-info';
+    info.innerHTML = `
+      <div class="history-short">
+        <a href="${escHtml(item.short)}" target="_blank" rel="noopener">${escHtml(item.short)}</a>
+      </div>
+      <div class="history-original" title="${escHtml(item.original)}">${escHtml(item.original)}</div>
+      <div class="history-meta">
+        <span class="history-meta-item"><strong>${item.clicks ?? 0}</strong> clicks</span>
+        <span class="history-meta-item">expires <strong>${formatExpiryHours(item.expiry)}</strong></span>
+      </div>
+    `;
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'history-actions';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-icon';
+    copyBtn.title = 'Copy';
+    copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/></svg>`;
+    copyBtn.addEventListener('click', () => copyText(item.short));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-icon';
+    delBtn.title = 'Remove';
+    delBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M6.5 4V2.5h3V4M5 4l.5 9h5L11 4"/></svg>`;
+    delBtn.addEventListener('click', () => removeHistoryItem(item.short));
+
+    actions.appendChild(copyBtn);
+    actions.appendChild(delBtn);
+
+    row.appendChild(qrWrap);
+    row.appendChild(info);
+    row.appendChild(actions);
+    listEl.appendChild(row);
+
+    // Render the QR thumbnail into its canvas
+    renderQR(qrCanvas, item.short, 56);
+  });
+}
+
+function initHistory() {
+  $('history-clear').addEventListener('click', () => {
+    if (loadHistory().length === 0) return;
+    saveHistory([]);
+    renderHistory();
+    toast('History cleared');
+  });
+  renderHistory();
 }
 
 /* ─── Boot ────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initShorten();
-  initQR();
   initStats();
+  initHistory();
 
-  // Animate hero on load
   document.querySelectorAll('[data-animate]').forEach((el, i) => {
     el.style.animationDelay = `${i * 80}ms`;
     el.classList.add('anim-in');
