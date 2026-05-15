@@ -209,15 +209,6 @@ A few implementation details worth noting:
 
 ---
 
-## Roadmap
-
-- [ ] **gRPC microservices** — split the service using the definitions in `proto/url.proto`
-- [ ] **Analytics dashboard** — per-click data (timestamp, referrer, geography)
-- [ ] **Authentication** — user accounts and private link management
-- [ ] **Custom domains** — let users bring their own domain
-
----
-
 ## License
 
 [MIT](LICENSE)
