@@ -147,5 +147,8 @@ func (h *Handler) Redirect(ctx *fiber.Ctx) error {
 
 	_ = h.service.IncrementHits(ctx.Context(), shortID)
 
+	// Tell search engines not to index short links — they're redirects, not content.
+	ctx.Set("X-Robots-Tag", "noindex, nofollow")
+
 	return ctx.Redirect(url, fiber.StatusMovedPermanently)
 }

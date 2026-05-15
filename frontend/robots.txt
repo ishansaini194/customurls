@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Allow: /style.css
+Allow: /script.js
+Allow: /og-image.png
+
+# Block API endpoints — these aren't content
+Disallow: /shorten
+Disallow: /stats/
+Disallow: /qr/
+
+# Block crawling of arbitrary short URLs (they redirect, no content to index)
+# We can't block /:shortID directly without blocking the homepage, so we
+# rely on X-Robots-Tag: noindex on redirect responses (set by the backend).
+
+Sitemap: https://customurls.in/sitemap.xml
