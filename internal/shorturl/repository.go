@@ -8,7 +8,7 @@ import (
 )
 
 type Repository interface {
-	Create(ctx context.Context, originalUrl, shortID string, expiresAt *time.Time) error
+	Create(ctx context.Context, originalUrl, shortID, passwordHash string, expiresAt *time.Time) error
 	GetUrl(ctx context.Context, shortID string) (*URL, error)
 	IncrementHits(ctx context.Context, shortID string) error
 	GetHits(ctx context.Context, shortID string) (int, error)
@@ -22,11 +22,12 @@ func NewPostgresRepository(db *gorm.DB) Repository {
 	return &postgresRepository{db}
 }
 
-func (r *postgresRepository) Create(ctx context.Context, originalUrl, shortID string, expiresAt *time.Time) error {
+func (r *postgresRepository) Create(ctx context.Context, originalUrl, shortID, passwordHash string, expiresAt *time.Time) error {
 	url := &URL{
-		OriginalURL: originalUrl,
-		ShortID:     shortID,
-		ExpiresAt:   expiresAt,
+		OriginalURL:  originalUrl,
+		ShortID:      shortID,
+		ExpiresAt:    expiresAt,
+		PasswordHash: passwordHash,
 	}
 	return r.db.WithContext(ctx).Create(url).Error
 }

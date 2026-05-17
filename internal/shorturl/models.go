@@ -8,12 +8,13 @@ import (
 )
 
 type URL struct {
-	ID          uint       `json:"id"           gorm:"primaryKey;autoIncrement"`
-	OriginalURL string     `json:"original_url" gorm:"not null"`
-	ShortID     string     `json:"short_id"     gorm:"uniqueIndex;not null"`
-	CreatedAt   time.Time  `json:"created_at"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	Hits        int        `json:"hits" gorm:"default:0"`
+	ID           uint       `json:"id"           gorm:"primaryKey;autoIncrement"`
+	OriginalURL  string     `json:"original_url" gorm:"not null"`
+	ShortID      string     `json:"short_id"     gorm:"uniqueIndex;not null"`
+	CreatedAt    time.Time  `json:"created_at"`
+	ExpiresAt    *time.Time `json:"expires_at"`
+	Hits         int        `json:"hits" gorm:"default:0"`
+	PasswordHash string     `json:"password_hash,omitempty" gorm:"default:null"`
 }
 
 func Migrate(db *gorm.DB) error {

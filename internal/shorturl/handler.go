@@ -14,9 +14,10 @@ type Handler struct {
 }
 
 type request struct {
-	Url    string        `json:"url"`
-	Alias  string        `json:"alias"`
-	Expiry time.Duration `json:"expiry"` // in hours
+	Url      string        `json:"url"`
+	Alias    string        `json:"alias"`
+	Expiry   time.Duration `json:"expiry"` // in hours
+	Password string        `json:"password"`
 }
 
 type response struct {
@@ -45,7 +46,7 @@ func (h *Handler) CreateShortUrl(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid url"})
 	}
 
-	short, err := h.service.CreateShortUrl(ctx.Context(), body.Url, body.Alias, body.Expiry)
+	short, err := h.service.CreateShortUrl(ctx.Context(), body.Url, body.Alias, body.Password, body.Expiry)
 	if err != nil {
 		if err.Error() == "short url already exists" {
 			return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
@@ -84,11 +85,10 @@ func (h *Handler) GetStats(ctx *fiber.Ctx) error {
 		"original_url": url.OriginalURL,
 		"created_at":   url.CreatedAt,
 		"expires_at":   url.ExpiresAt,
+		"protected":    url.PasswordHash != "",
 	})
 }
 
-// GetQR returns a PNG QR code that encodes the short URL for the given shortID.
-// Optional query param ?size=NNN sets the pixel size (clamped to 64..1024).
 func (h *Handler) GetQR(ctx *fiber.Ctx) error {
 	shortID := ctx.Params("shortID")
 
@@ -137,18 +137,43 @@ func buildQRTarget(shortID string) string {
 func (h *Handler) Redirect(ctx *fiber.Ctx) error {
 	shortID := ctx.Params("shortID")
 
-	url, err := h.service.GetOriginalUrl(ctx.Context(), shortID)
+	url, err := h.service.GetURLCached(ctx.Context(), shortID)
 	if err != nil {
-		if err.Error() == "short url expired" {
-			return ctx.Status(fiber.StatusGone).JSON(fiber.Map{"error": "short url expired"})
-		}
 		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "short url not found"})
+	}
+	if url.ExpiresAt != nil && url.ExpiresAt.Before(time.Now()) {
+		return ctx.Status(fiber.StatusGone).JSON(fiber.Map{"error": "short url expired"})
+	}
+
+	ctx.Set("X-Robots-Tag", "noindex, nofollow")
+
+	// protected → serve the unlock page (JS there handles verification)
+	if url.PasswordHash != "" {
+		return ctx.SendFile("./frontend/unlock.html")
+	}
+
+	// not protected → normal redirect
+	_ = h.service.IncrementHits(ctx.Context(), shortID)
+	return ctx.Redirect(url.OriginalURL, fiber.StatusMovedPermanently)
+}
+
+type verifyRequest struct {
+	Password string `json:"password"`
+}
+
+func (h *Handler) VerifyPassword(ctx *fiber.Ctx) error {
+	shortID := ctx.Params("shortID")
+
+	body := new(verifyRequest)
+	if err := ctx.BodyParser(body); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cannot parse json"})
+	}
+
+	originalURL, err := h.service.VerifyPassword(ctx.Context(), shortID, body.Password)
+	if err != nil {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "incorrect password"})
 	}
 
 	_ = h.service.IncrementHits(ctx.Context(), shortID)
-
-	// Tell search engines not to index short links — they're redirects, not content.
-	ctx.Set("X-Robots-Tag", "noindex, nofollow")
-
-	return ctx.Redirect(url, fiber.StatusMovedPermanently)
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"url": originalURL})
 }
