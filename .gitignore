@@ -17,6 +17,10 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Compiled CLI binary
+custom
+cshort
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
@@ -24,6 +28,13 @@ profile.cov
 go.work
 go.work.sum
 
+# Environment / secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Deploy script (may contain server IP / credentials)
+deploy.sh
 
 # Editor/IDE
 # .idea/
