@@ -34,6 +34,9 @@ function truncate(str, max) {
   return str.length <= max ? str : str.slice(0, max) + '…';
 }
 
+// Small lock icon markup, used wherever a protected link is shown.
+const LOCK_ICON = '<svg class="lock-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>';
+
 // Expiry comes from /shorten as hours; from /stats as an ISO timestamp.
 function formatExpiryHours(hours) {
   if (!hours || hours === 0) return 'Never';
@@ -98,6 +101,7 @@ function initShorten() {
   const urlInput = $('url-input');
   const aliasInput = $('alias-input');
   const expiryInput = $('expiry-input');
+  const passwordInput = $('password-input');
   const btnText = $('shorten-btn-text');
   const spinner = $('shorten-spinner');
   const errorEl = $('shorten-error');
@@ -122,6 +126,7 @@ function initShorten() {
     const url = urlInput.value.trim();
     const alias = aliasInput.value.trim();
     const expiry = expiryInput.value.trim();
+    const password = passwordInput.value;   // not trimmed — spaces may be intentional
 
     if (!url) {
       urlInput.classList.add('error');
@@ -145,6 +150,7 @@ function initShorten() {
       const body = { url };
       if (alias) body.alias = alias;
       if (expiry) body.expiry = parseInt(expiry) * 24; // days → hours
+      if (password) body.password = password;
 
       const res = await fetch(`${BACKEND_URL}/shorten`, {
         method: 'POST',
@@ -173,8 +179,12 @@ function initShorten() {
         original: data.url || url,
         expiry: data.expiry,            // hours
         clicks: 0,
+        protected: !!password,
         savedAt: Date.now(),
       });
+
+      // clear the password field after a successful shorten
+      passwordInput.value = '';
 
       resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -248,6 +258,7 @@ function initStats() {
       $('stat-original').innerHTML = data.original_url
         ? `<a href="${escHtml(data.original_url)}" target="_blank" rel="noopener">${escHtml(truncate(data.original_url, 70))}</a>`
         : '—';
+      $('stat-protected').textContent = data.protected ? 'Yes — password required' : 'No';
 
       show(result);
 
@@ -336,12 +347,15 @@ function renderHistory() {
     qrImg.src = qrEndpoint(item.short, 120);
     qrWrap.appendChild(qrImg);
 
+    // Lock icon for protected links
+    const lockIcon = item.protected ? LOCK_ICON : '';
+
     // Info block
     const info = document.createElement('div');
     info.className = 'history-info';
     info.innerHTML = `
       <div class="history-short">
-        <a href="${escHtml(item.short)}" target="_blank" rel="noopener">${escHtml(item.short)}</a>
+        ${lockIcon}<a href="${escHtml(item.short)}" target="_blank" rel="noopener">${escHtml(item.short)}</a>
       </div>
       <div class="history-original" title="${escHtml(item.original)}">${escHtml(item.original)}</div>
       <div class="history-meta">

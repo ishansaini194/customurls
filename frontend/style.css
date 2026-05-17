@@ -1049,6 +1049,12 @@ footer {
   color: var(--amber);
 }
 
+.lock-icon {
+  color: var(--amber-2);
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
 /* ─── Toast ───────────────────────────────────────────────────────── */
 .toast {
   position: fixed;

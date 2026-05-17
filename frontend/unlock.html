@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Protected link — customurls.in</title>
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23E87722'/><text x='6' y='23' font-size='18' font-family='serif' font-weight='bold' fill='white'>u</text></svg>" />
+
+  <style>
+    /* Page-specific layout — reuses the shared design tokens from style.css */
+    .unlock-main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+    }
+
+    .unlock-card {
+      width: 100%;
+      max-width: 400px;
+      background: white;
+      border: 1.5px solid var(--cream-3);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 36px 32px;
+      text-align: center;
+    }
+
+    .unlock-lock {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 20px;
+      background: var(--amber-pale);
+      border: 1.5px solid var(--amber-mid);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .unlock-lock svg {
+      width: 26px;
+      height: 26px;
+      color: var(--amber-2);
+    }
+
+    .unlock-title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .unlock-sub {
+      font-size: 13px;
+      color: var(--ink-3);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .unlock-form {
+      text-align: left;
+    }
+
+    .unlock-error {
+      background: #FDF2F2;
+      border: 1px solid #EAB5B5;
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--red);
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    .unlock-error.show {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Nav ──────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">
+        <span class="nav-logo-mark">
+          <svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 1L13 7L7 13M1 7h12" stroke="white" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" fill="none" />
+          </svg>
+        </span>
+        <span class="nav-logo-text">custom<span class="nav-logo-tld">urls</span>.in</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#cli">CLI</a></li>
+        <li><a href="https://github.com/ishansaini194/customurls" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Unlock card ──────────────────────────────────────────────── -->
+  <main class="unlock-main">
+    <div class="unlock-card">
+
+      <div class="unlock-lock">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <rect x="4" y="11" width="16" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 018 0v4" />
+          <circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none" />
+        </svg>
+      </div>
+
+      <h1 class="unlock-title">Protected link</h1>
+      <p class="unlock-sub">This link is password-protected. Enter the password to continue.</p>
+
+      <form id="unlock-form" class="unlock-form" novalidate>
+        <div id="unlock-error" class="unlock-error"></div>
+
+        <div class="form-group">
+          <label class="form-label" for="password-input">Password</label>
+          <input id="password-input" class="form-input" type="password" placeholder="Enter password" autocomplete="off"
+            autofocus />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top: 4px;">
+          <span id="unlock-btn-text">Unlock</span>
+          <div id="unlock-spinner" class="spinner"></div>
+        </button>
+      </form>
+
+    </div>
+  </main>
+
+  <!-- ── Footer ───────────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">custom<span>urls</span>.in</div>
+      <p class="footer-copy">Built with Go + Redis · Open Source</p>
+      <ul class="footer-links">
+        <li><a href="https://github.com/ishansaini194/customurls/blob/main/README.md" target="_blank"
+            rel="noopener">Docs</a></li>
+        <li><a href="https://github.com/ishansaini194/customurls" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+      var parts = path.split('/');
+      var shortID = parts[parts.length - 1];
+
+      var form = document.getElementById('unlock-form');
+      var input = document.getElementById('password-input');
+      var errorEl = document.getElementById('unlock-error');
+      var btnText = document.getElementById('unlock-btn-text');
+      var spinner = document.getElementById('unlock-spinner');
+      var submitBtn = form.querySelector('button[type=submit]');
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        errorEl.classList.remove('show');
+
+        var password = input.value;
+        if (!password) {
+          errorEl.textContent = 'Please enter the password.';
+          errorEl.classList.add('show');
+          return;
+        }
+
+        btnText.textContent = 'Unlocking…';
+        spinner.classList.add('show');
+        submitBtn.disabled = true;
+
+        fetch('/verify/' + encodeURIComponent(shortID), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: password })
+        })
+          .then(function (res) {
+            return res.json().then(function (data) {
+              return { ok: res.ok, data: data };
+            });
+          })
+          .then(function (result) {
+            if (!result.ok) {
+              errorEl.textContent = result.data.error || 'Incorrect password.';
+              errorEl.classList.add('show');
+              input.value = '';
+              input.focus();
+              return;
+            }
+            // Success — redirect to the original URL
+            window.location.replace(result.data.url);
+          })
+          .catch(function () {
+            errorEl.textContent = 'Something went wrong. Please try again.';
+            errorEl.classList.add('show');
+          })
+          .finally(function () {
+            btnText.textContent = 'Unlock';
+            spinner.classList.remove('show');
+            submitBtn.disabled = false;
+          });
+      });
+    })();
+  </script>
+
+</body>
+
+</html>
