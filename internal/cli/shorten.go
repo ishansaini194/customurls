@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	shortenAlias string
-	shortenJSON  bool
-	shortenQR    bool
+	shortenAlias    string
+	shortenPassword string
+	shortenJSON     bool
+	shortenQR       bool
 )
 
 var shortenCmd = &cobra.Command{
@@ -21,12 +22,14 @@ var shortenCmd = &cobra.Command{
 	Long: `Shorten a URL and print the short link.
 
 Use --alias to choose a custom short ID instead of a random one.
+Use --password to protect the link — visitors must enter it to open it.
 Use --qr to also print a scannable QR code in the terminal.
 Use --json to print the full response as JSON (useful for scripts).
 
 Examples:
   custom short https://example.com/very/long/url
   custom short https://example.com --alias my-link
+  custom short https://example.com --password secret123
   custom short https://example.com --qr
   custom short https://example.com --json`,
 	Args: cobra.ExactArgs(1),
@@ -39,7 +42,7 @@ Examples:
 			return fmt.Errorf("invalid URL: must start with http:// or https://")
 		}
 
-		resp, err := shorten(input, shortenAlias)
+		resp, err := shorten(input, shortenAlias, shortenPassword)
 		if err != nil {
 			return err
 		}
@@ -55,6 +58,9 @@ Examples:
 		fmt.Printf("  %s %s\n", labelStyle("short: "), valueStyle(resp.Short))
 		fmt.Printf("  %s %s\n", labelStyle("target:"), resp.URL)
 		fmt.Printf("  %s %s\n", labelStyle("expiry:"), formatExpiry(resp.Expiry))
+		if shortenPassword != "" {
+			fmt.Printf("  %s %s\n", labelStyle("locked:"), valueStyle("password required"))
+		}
 
 		if shortenQR {
 			qr, err := qrcode.New(resp.Short, qrcode.Medium)
@@ -62,7 +68,6 @@ Examples:
 				return fmt.Errorf("failed to generate QR: %w", err)
 			}
 			fmt.Println()
-			// ToSmallString packs 2 rows per line — fits in a normal terminal.
 			fmt.Print(qr.ToSmallString(false))
 		}
 		return nil
@@ -71,6 +76,7 @@ Examples:
 
 func init() {
 	shortenCmd.Flags().StringVarP(&shortenAlias, "alias", "a", "", "custom alias for the short URL")
+	shortenCmd.Flags().StringVarP(&shortenPassword, "password", "p", "", "password-protect the link")
 	shortenCmd.Flags().BoolVar(&shortenJSON, "json", false, "output as JSON")
 	shortenCmd.Flags().BoolVar(&shortenQR, "qr", false, "also print a QR code in the terminal")
 }

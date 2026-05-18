@@ -16,8 +16,9 @@ var httpClient = &http.Client{Timeout: 10 * time.Second}
 // ── Shorten ──────────────────────────────────────────────────────────
 
 type shortenRequest struct {
-	URL   string `json:"url"`
-	Alias string `json:"alias,omitempty"`
+	URL      string `json:"url"`
+	Alias    string `json:"alias,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 type ShortenResponse struct {
@@ -27,9 +28,8 @@ type ShortenResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
-// shorten posts to /shorten and returns the parsed response.
-func shorten(url, alias string) (*ShortenResponse, error) {
-	body, err := json.Marshal(shortenRequest{URL: url, Alias: alias})
+func shorten(url, alias, password string) (*ShortenResponse, error) {
+	body, err := json.Marshal(shortenRequest{URL: url, Alias: alias, Password: password})
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
