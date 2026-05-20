@@ -1,6 +1,7 @@
 package shorturl
 
 import (
+	"errors"
 	"os"
 	"time"
 
@@ -171,7 +172,16 @@ func (h *Handler) VerifyPassword(ctx *fiber.Ctx) error {
 
 	originalURL, err := h.service.VerifyPassword(ctx.Context(), shortID, body.Password)
 	if err != nil {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "incorrect password"})
+		switch {
+		case errors.Is(err, ErrNotFound):
+			return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "short url not found"})
+		case errors.Is(err, ErrExpired):
+			return ctx.Status(fiber.StatusGone).JSON(fiber.Map{"error": "short url expired"})
+		case errors.Is(err, ErrIncorrectPassword):
+			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "incorrect password"})
+		default:
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "server error"})
+		}
 	}
 
 	_ = h.service.IncrementHits(ctx.Context(), shortID)

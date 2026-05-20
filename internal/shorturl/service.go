@@ -37,11 +37,22 @@ func (s *service) CreateShortUrl(ctx context.Context, originalUrl, alias, passwo
 		return "", errors.New("cannot shorten own domain")
 	}
 
-	shortID := generateShort(0, "")
-
-	exists, err := s.cache.Exists(ctx, shortID)
-	if err == nil && exists {
-		return "", errors.New("short url already exists")
+	const maxAttempts = 5
+	var shortID string
+	for i := 0; i < maxAttempts; i++ {
+		candidate := generateShort(0, "")
+		_, err := s.repository.GetUrl(ctx, candidate)
+		if errors.Is(err, ErrNotFound) {
+			shortID = candidate
+			break
+		}
+		if err != nil {
+			return "", err // real DB error, bail
+		}
+		// else: ID exists, try again
+	}
+	if shortID == "" {
+		return "", errors.New("could not generate unique short id")
 	}
 
 	if expiry == 0 {
@@ -79,14 +90,13 @@ func (s *service) VerifyPassword(ctx context.Context, shortID, password string) 
 		return "", err
 	}
 	if url.ExpiresAt != nil && time.Now().After(*url.ExpiresAt) {
-		return "", errors.New("short url expired")
+		return "", ErrExpired
 	}
 	if url.PasswordHash == "" {
-		// not protected — just return the URL
 		return url.OriginalURL, nil
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(url.PasswordHash), []byte(password)); err != nil {
-		return "", errors.New("incorrect password")
+		return "", ErrIncorrectPassword
 	}
 	return url.OriginalURL, nil
 }
@@ -107,7 +117,7 @@ func (s *service) GetOriginalUrl(ctx context.Context, shortID string) (string, e
 	if err == nil {
 		// check expiry
 		if cached.ExpiresAt != nil && time.Now().After(*cached.ExpiresAt) {
-			return "", errors.New("short url expired")
+			return "", ErrExpired
 		}
 		return cached.OriginalURL, nil
 	}
@@ -120,7 +130,7 @@ func (s *service) GetOriginalUrl(ctx context.Context, shortID string) (string, e
 
 	// 3. check expiry
 	if url.ExpiresAt != nil && time.Now().After(*url.ExpiresAt) {
-		return "", errors.New("short url expired")
+		return "", ErrExpired
 	}
 
 	// 4. populate cache safely
@@ -168,15 +178,12 @@ func generateShort(length int, charset string) string {
 	return string(b)
 }
 
-// GetURLCached returns the URL record, checking cache first then Postgres.
-// Used by the redirect handler so it can see PasswordHash without
-// always hitting the database.
 func (s *service) GetURLCached(ctx context.Context, shortID string) (*URL, error) {
 	// 1. cache first
 	cached, err := s.cache.Get(ctx, shortID)
 	if err == nil {
 		if cached.ExpiresAt != nil && time.Now().After(*cached.ExpiresAt) {
-			return nil, errors.New("short url expired")
+			return nil, ErrExpired
 		}
 		return cached, nil
 	}
@@ -187,7 +194,7 @@ func (s *service) GetURLCached(ctx context.Context, shortID string) (*URL, error
 		return nil, err
 	}
 	if url.ExpiresAt != nil && time.Now().After(*url.ExpiresAt) {
-		return nil, errors.New("short url expired")
+		return nil, ErrExpired
 	}
 
 	// 3. populate cache

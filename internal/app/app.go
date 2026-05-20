@@ -48,14 +48,12 @@ func New(cfg *config.Config) (*server.Server, error) {
 		AllowHeaders: "Origin, Content-Type, Accept",
 		AllowMethods: "GET, POST",
 	}))
+	rl := middleware.RateLimit(limiter, cfg.APIQuota)
 
-	srv.App.Use(middleware.RateLimit(limiter, cfg.APIQuota))
-
-	// API routes
-	srv.App.Post("/shorten", handler.CreateShortUrl)
+	srv.App.Post("/shorten", rl, handler.CreateShortUrl)
+	srv.App.Post("/verify/:shortID", rl, handler.VerifyPassword)
 	srv.App.Get("/stats/:shortID", handler.GetStats)
 	srv.App.Get("/qr/:shortID", handler.GetQR)
-	srv.App.Post("/verify/:shortID", handler.VerifyPassword)
 
 	// ✅ Serve frontend FIRST
 	srv.App.Static("/", "./frontend", fiber.Static{

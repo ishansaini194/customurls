@@ -23,3 +23,5 @@ func Migrate(db *gorm.DB) error {
 
 var ErrCacheMiss = errors.New("cache miss")
 var ErrNotFound = errors.New("short url not found")
+var ErrExpired = errors.New("short url expired")
+var ErrIncorrectPassword = errors.New("incorrect password")
