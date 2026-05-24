@@ -2,7 +2,10 @@ package shorturl
 
 import (
 	"errors"
+	"image/color"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/asaskevich/govalidator"
@@ -93,7 +96,6 @@ func (h *Handler) GetStats(ctx *fiber.Ctx) error {
 func (h *Handler) GetQR(ctx *fiber.Ctx) error {
 	shortID := ctx.Params("shortID")
 
-	// Confirm the short URL exists (and isn't expired) before generating a QR.
 	url, err := h.service.GetStats(ctx.Context(), shortID)
 	if err != nil {
 		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "short url not found"})
@@ -111,7 +113,6 @@ func (h *Handler) GetQR(ctx *fiber.Ctx) error {
 		size = 1024
 	}
 
-	// The QR encodes the canonical redirect URL: DOMAIN/shortID
 	target := buildQRTarget(url.ShortID)
 
 	png, err := qrcode.Encode(target, qrcode.Medium, size)
@@ -124,11 +125,65 @@ func (h *Handler) GetQR(ctx *fiber.Ctx) error {
 	return ctx.Send(png)
 }
 
-// buildQRTarget builds the full short URL the QR should point to.
+func (h *Handler) GenerateQR(ctx *fiber.Ctx) error {
+	target := ctx.Query("url")
+	if target == "" {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "url required"})
+	}
+	if !govalidator.IsURL(target) {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid url"})
+	}
+
+	size := ctx.QueryInt("size", 256)
+	if size < 64 {
+		size = 64
+	}
+	if size > 1024 {
+		size = 1024
+	}
+
+	dark := color.RGBA{0x1a, 0x18, 0x16, 0xff} // default near-black
+	if hex := ctx.Query("color"); hex != "" {
+		c, err := parseHexColor(hex)
+		if err == nil {
+			dark = c
+		}
+	}
+
+	q, err := qrcode.New(target, qrcode.Medium)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate qr"})
+	}
+	q.ForegroundColor = dark
+	q.BackgroundColor = color.White
+
+	png, err := q.PNG(size)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate qr"})
+	}
+
+	ctx.Set("Content-Type", "image/png")
+	ctx.Set("Cache-Control", "public, max-age=86400")
+	return ctx.Send(png)
+}
+
+func parseHexColor(s string) (color.RGBA, error) {
+	s = strings.TrimPrefix(s, "#")
+	if len(s) != 6 {
+		return color.RGBA{}, errors.New("bad hex")
+	}
+	r, err1 := strconv.ParseUint(s[0:2], 16, 8)
+	g, err2 := strconv.ParseUint(s[2:4], 16, 8)
+	b, err3 := strconv.ParseUint(s[4:6], 16, 8)
+	if err1 != nil || err2 != nil || err3 != nil {
+		return color.RGBA{}, errors.New("bad hex")
+	}
+	return color.RGBA{uint8(r), uint8(g), uint8(b), 0xff}, nil
+}
+
 func buildQRTarget(shortID string) string {
 	domain := os.Getenv("DOMAIN")
 	scheme := "https://"
-	// localhost is plain http during development
 	if len(domain) >= 9 && domain[:9] == "localhost" {
 		scheme = "http://"
 	}
@@ -148,12 +203,10 @@ func (h *Handler) Redirect(ctx *fiber.Ctx) error {
 
 	ctx.Set("X-Robots-Tag", "noindex, nofollow")
 
-	// protected → serve the unlock page (JS there handles verification)
 	if url.PasswordHash != "" {
 		return ctx.SendFile("./frontend/unlock.html")
 	}
 
-	// not protected → normal redirect
 	_ = h.service.IncrementHits(ctx.Context(), shortID)
 	return ctx.Redirect(url.OriginalURL, fiber.StatusMovedPermanently)
 }

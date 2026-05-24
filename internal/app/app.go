@@ -52,16 +52,15 @@ func New(cfg *config.Config) (*server.Server, error) {
 
 	srv.App.Post("/shorten", rl, handler.CreateShortUrl)
 	srv.App.Post("/verify/:shortID", rl, handler.VerifyPassword)
+	srv.App.Get("/qr", handler.GenerateQR)
 	srv.App.Get("/stats/:shortID", handler.GetStats)
 	srv.App.Get("/qr/:shortID", handler.GetQR)
 
-	// ✅ Serve frontend FIRST
 	srv.App.Static("/", "./frontend", fiber.Static{
 		Index:  "index.html",
 		Browse: false,
 	})
 
-	// ✅ Redirect routes AFTER static + skip files
 	srv.App.Get("/:shortID", func(c *fiber.Ctx) error {
 		shortID := c.Params("shortID")
 

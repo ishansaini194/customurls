@@ -272,25 +272,26 @@ function initShorten() {
     }
   });
 
-  quickQrBtn.addEventListener('click', async () => {
+  quickQrBtn.addEventListener('click', () => {
     if (!currentShortUrl) return;
     if (quickQrOut.classList.contains('show')) { hide(quickQrOut); return; }
-    try {
-      await QRCode.toCanvas(quickCanvas, currentShortUrl, {
-        width: 240, margin: 1,
-        color: { dark: '#1a1816', light: '#ffffff' },
-      });
-      show(quickQrOut);
-    } catch (err) {
-      toast('Failed to generate QR', 'err');
+
+    let img = document.getElementById('quick-qr-img');
+    if (!img) {
+      img = document.createElement('img');
+      img.id = 'quick-qr-img';
+      img.width = 240; img.height = 240;
+      img.alt = 'QR code';
+      quickCanvas.replaceWith(img);
     }
+    img.src = `/qr?url=${encodeURIComponent(currentShortUrl)}&size=240`;
+    show(quickQrOut);
   });
 
   quickQrDl.addEventListener('click', () => {
     if (!currentShortUrl) return;
-    const url = quickCanvas.toDataURL('image/png');
     const a = document.createElement('a');
-    a.href = url;
+    a.href = `/qr?url=${encodeURIComponent(currentShortUrl)}&size=512`;
     a.download = `customurl-qr.png`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   });
@@ -303,34 +304,42 @@ function initShorten() {
   window.__customurls_getCurrentShort = () => currentShortUrl;
 }
 
-/* ─── QR tab (entirely client-side) ──────────────────────────────── */
 function initQRTab() {
   const form = $('qr-form');
   const urlIn = $('qr-url-input');
-  const colorIn = $('qr-color');
   const sizeIn = $('qr-size');
-  const fmtIn = $('qr-format');
   const errEl = $('qr-error');
   const previewBox = $('qr-preview-box');
   const emptyEl = $('qr-preview-empty');
-  const canvas = $('qr-canvas');
-  const svgMount = $('qr-svg-mount');
   const dlBtn = $('qr-download-btn');
+  const colorIn = $('qr-color');
 
-  let lastResult = null; // { dataUrl, format, fileName }
+  let lastUrl = '';
+  let lastSize = 240;
+
+  // Replace the old canvas with an <img> permanently
+  const oldCanvas = $('qr-canvas');
+  const oldSvgMount = $('qr-svg-mount');
+  if (oldSvgMount) oldSvgMount.remove();
+
+  const img = document.createElement('img');
+  img.id = 'qr-img';
+  img.width = 200; img.height = 200;
+  img.alt = 'QR code';
+  img.style.display = 'none';
+  if (oldCanvas) oldCanvas.replaceWith(img); else previewBox.appendChild(img);
 
   function clearPreview() {
-    canvas.style.display = 'none';
-    svgMount.style.display = 'none';
-    svgMount.innerHTML = '';
+    img.style.display = 'none';
+    img.src = '';
     previewBox.classList.remove('is-filled');
     emptyEl.style.display = '';
     dlBtn.disabled = true;
-    lastResult = null;
+    lastUrl = '';
   }
   clearPreview();
 
-  async function generate() {
+  function generate() {
     hide(errEl);
     const url = urlIn.value.trim();
     if (!url) {
@@ -345,70 +354,37 @@ function initQRTab() {
       return;
     }
 
-    const color = colorIn.value;
-    const size = parseInt(sizeIn.value, 10);
-    const format = fmtIn.value;
-
-    const opts = {
-      width: size,
-      margin: 1,
-      color: { dark: color, light: '#ffffff' },
-      errorCorrectionLevel: 'M',
-    };
-
-    try {
-      if (format === 'svg') {
-        const svgStr = await QRCode.toString(url, { ...opts, type: 'svg' });
-        svgMount.innerHTML = svgStr;
-        const svgEl = svgMount.querySelector('svg');
-        if (svgEl) {
-          svgEl.setAttribute('width', '200');
-          svgEl.setAttribute('height', '200');
-        }
-        canvas.style.display = 'none';
-        svgMount.style.display = '';
-        emptyEl.style.display = 'none';
-        previewBox.classList.add('is-filled');
-
-        const blob = new Blob([svgStr], { type: 'image/svg+xml' });
-        lastResult = { dataUrl: URL.createObjectURL(blob), format: 'svg', fileName: 'qr.svg' };
-      } else {
-        canvas.width = size; canvas.height = size;
-        await QRCode.toCanvas(canvas, url, opts);
-        svgMount.style.display = 'none';
-        canvas.style.display = '';
-        emptyEl.style.display = 'none';
-        previewBox.classList.add('is-filled');
-        lastResult = { dataUrl: canvas.toDataURL('image/png'), format: 'png', fileName: 'qr.png' };
-      }
-      dlBtn.disabled = false;
-      toast('QR generated');
-    } catch (err) {
-      console.error(err);
-      errEl.textContent = 'Could not generate QR — try a shorter URL.';
-      show(errEl);
-    }
+    lastSize = parseInt(sizeIn.value, 10);
+    lastUrl = url;
+    const colorParam = encodeURIComponent(colorIn.value);
+    img.src = `/qr?url=${encodeURIComponent(url)}&size=${lastSize}&color=${colorParam}`; 
+    img.style.display = '';
+    emptyEl.style.display = 'none';
+    previewBox.classList.add('is-filled');
+    dlBtn.disabled = false;
+    toast('QR generated');
   }
 
   form.addEventListener('submit', e => { e.preventDefault(); generate(); });
 
   dlBtn.addEventListener('click', () => {
-    if (!lastResult) return;
+    if (!lastUrl) return;
     const a = document.createElement('a');
-    a.href = lastResult.dataUrl;
-    a.download = lastResult.fileName;
+    a.href = `/qr?url=${encodeURIComponent(lastUrl)}&size=${Math.max(lastSize, 512)}&color=${encodeURIComponent(colorIn.value)}`;
+    a.download = 'qr.png';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   });
 
-  // Live regen if user changes color/size/format AND there's already a value
-  [colorIn, sizeIn, fmtIn].forEach(input => {
-    input.addEventListener('change', () => {
-      if (urlIn.value.trim() && lastResult) generate();
-    });
+  colorIn.addEventListener('change', () => {
+    if (lastUrl) generate();
   });
+
+  sizeIn.addEventListener('change', () => {
+    if (lastUrl) generate();
+  });
+
 }
 
-/* ─── Protected tab ──────────────────────────────────────────────── */
 function initProtected() {
   const form = $('protected-form');
   const urlIn = $('protected-url');
@@ -611,13 +587,12 @@ function renderHistory() {
 
     const qrWrap = document.createElement('div');
     qrWrap.className = 'history-qr';
-    const qrCanvas = document.createElement('canvas');
-    qrCanvas.width = 80; qrCanvas.height = 80;
-    qrWrap.appendChild(qrCanvas);
-    // generate locally
-    QRCode.toCanvas(qrCanvas, item.short, {
-      width: 80, margin: 0, color: { dark: '#1a1816', light: '#ffffff' },
-    }).catch(() => { qrWrap.style.background = 'var(--surface-2)'; qrCanvas.style.display = 'none'; });
+    const qrImg = document.createElement('img');
+    qrImg.width = 80; qrImg.height = 80;
+    qrImg.alt = '';
+    qrImg.src = `/qr?url=${encodeURIComponent(item.short)}&size=80`;
+    qrImg.onerror = () => { qrWrap.style.background = 'var(--surface-2)'; qrImg.style.display = 'none'; };
+    qrWrap.appendChild(qrImg);
 
     const lockIcon = item.protected ? LOCK_ICON : '';
 
